@@ -1,0 +1,401 @@
+<!DOCTYPE>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<link rel="shortcut icon" type="image/png" href="extra/favicon.png" />
+	<link href="extra/style.css" rel="stylesheet">
+	<link href="extra/progressbar/css/lib/control/progressbar.css" rel="stylesheet">
+	<link href="extra/simplePagination/simplePagination.css" rel="stylesheet">
+	<link href="extra/new.css" rel="stylesheet">
+	
+	<script src="adapter.js" type="text/javascript"></script>
+	<script src="SignalingChannel.js" type="text/javascript"></script>
+	<script src="CacheManager.js" type="text/javascript"></script>
+	<script src="File.js" type="text/javascript"></script>
+	<script src="User.js" type="text/javascript"></script>
+	<script src="rtc.js" type="text/javascript"></script>
+	<script src="Sha-256.js" type="text/javascript"></script>
+	<script src="/extra/progressbar/lib/control/progressbar.js" type="text/javascript"></script>
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	<script type="text/javascript" src="extra/simplePagination/jquery.simplePagination.js"></script>
+
+</head>
+
+<body>
+	<div class="container" id="test">
+		<div class="header" id="header">
+			<h1>CSP2P</h1>
+			<span style="float: right" id="user-btn">
+				<a class="user-btn" href="#signin-box">Sign in</a>
+				<a class="user-btn" href="#signup-box">Sign up</a>
+			</span>
+			<span style="float: right" id="user-info">
+				<a class="user-btn" id="myfiles" href="#myfiles-box">My files</a>
+			</span>
+		</div>
+		<div class="connect">
+			<p>
+				<button id="connect" class="connect-button" onclick="connect()">Connect</button>
+			</p>
+			<p id="statusline" style="display: none;"><b>Status: <span id = "status">Connecting</span></b></p>
+		</div>
+		<div class="chat-box">
+			<textarea id="chatbox" rows="5" readonly style="width:100%;"></textarea>
+		</div>
+		<div class="chat-message">
+			<span>Chat message:</span>
+			<p>
+			<input type="text" style="width:84%; float: left;" name="chat" id="chat" onkeyup="
+				if (event.keyCode == 13) {sendChat(); return false;}"/>
+			<button id="connect" class="send-button" style="width:15%; float: right;" class="" onclick="sendChat()">Send</button>
+			</p>
+		</div>
+
+		<div class="file-area" id="file-area">
+			<div id="file-to-up">
+				<p id="upload-title">Choose file to upload</p>
+				<input type="file" id="files" name="files[]" multiple />
+				<button id="upload" name="upload" class="connect-button" onclick="user.upload()">Upload</button>
+			</div>
+			<p><b>All files</b></p>
+			<table id="all-file-table" style="width: 100%;">
+			</table>
+			<br>
+			<p id="selector"></p>
+		</div>
+
+		<div class="signin" id="signin-box">
+			<h3 style="text-align: center;">Sign in</h3>
+			<table style="margin: auto">
+				<tr><td><label>Username</label></td><td><input type="text" name="_username" id="_username"></td></tr>
+				<tr><td><label>Password</label></td><td><input type="password" name="_password" id="_pass"></td></tr>
+				<tr><td></td><td><button id="signin" class="connect-button" onclick="user.signin()">Sign in</button></td></tr>
+			</table>
+		</div>
+
+		<div class="signin" id="signup-box">
+			<h3 style="text-align: center;">Sign up</h3>
+			<table style="margin: auto">
+			<tr><td><label>Username</label></td><td><input type="text" name="username" id="username"></td></tr>
+			<tr><td><label>Password</label></td><td><input type="password" name="password" id="pass"></td></tr>
+			<tr><td><label>Re-Password</label></td><td><input type="password" name="re_password" id="re_pass"></td></tr>
+			<tr><td><label>Email</label></td><td><input type="email" name="email" id="email"></td></tr>
+			<tr><td></td><td><button id="signup" class="connect-button" onclick="user.signup()">Sign up</button></td></tr>
+			</table>
+		</div>
+
+		<div class="signin" id="myfiles-box">
+			<h3 style="text-align: center;">My files</h3>
+			<table style="margin: auto" id="myfile-table">
+			</table>
+		</div>
+		<footer class="footer"><p>&copy; GR3-HUST</p></footer>
+	</div> <!-- /container -->
+
+</body>
+
+<script>
+
+var signalingChannel, myId, connected = false, existUser,
+	cacheManager, signinSuccess, pageSize = 5, numItems, currentPage = 1,
+	partners = [], downloadList = [], pc = [], dc = [], data = {}, user,
+	doNothing = function() {};
+	
+var startTime, finishTime;
+
+function setState() {
+	if (user.username == "") {
+		document.getElementById('file-to-up').style.display = "none";
+		document.getElementById('user-info').style.display = "none";
+	} else {
+		getMyFiles(user.username);
+		document.getElementById('user-btn').style.display = "none";
+		document.getElementById('file-to-up').style.display = "inline";
+		document.getElementById('user-info').style.display = "inline";
+		var span = document.createElement('span');
+		span.id = "account";
+		span.textContent = user.username;
+		var btn = document.createElement('button');
+		btn.setAttribute("class", "user-btn");
+		btn.id = "signout_form";
+		btn.innerHTML = "Sign out";
+		btn.onclick = function () {
+			document.getElementById('user-info').removeChild(document.getElementById('signout_form'));
+			document.getElementById('user-info').removeChild(document.getElementById('account'));
+			document.getElementById('file-to-up').style.display = "none";
+			document.getElementById('user-info').style.display = "none";
+			document.getElementById('user-btn').style.display = "inline";
+			user.signout();
+		}
+		document.getElementById('user-info').insertBefore(span, document.getElementById('user-info').firstChild);
+		document.getElementById('user-info').appendChild(btn);
+	}
+}
+
+function getAllFiles() {
+	var client = new XMLHttpRequest();
+	client.onreadystatechange = function() {
+		if(this.readyState == this.DONE) {
+			if(this.status == 200 && this.response != null) {
+				var res = JSON.parse(this.response);
+				showAllFiles(res);
+			}
+		}
+	};
+	client.open("GET", "/filelist");
+	client.send();
+}
+
+function showAllFiles(files) {
+	for (var i in files) {
+		if (document.getElementById("file" + files[i].id) != null) continue;
+		createNewRow(files[i].id, files[i].filename, files[i].path, files[i].piece, files[i].type, files[i].uploader, files[i].size);
+	}
+	numItems = files.length;
+	paginator();
+}
+
+function createNewRow(id, filename, path, piece, type, uploader, size) {
+	var btn = createDownloadButton(id, filename, path, piece, type, size);
+	var table = document.getElementById('all-file-table');
+	var row = table.insertRow(0);
+		row.id = "file" + id;
+	var cell1 = row.insertCell(0),
+		cell2 = row.insertCell(1),
+		cell3 = row.insertCell(2),
+		cell4 = row.insertCell(3);
+	cell1.style.width = "50%";
+	cell2.style.width = "23%";
+	cell3.style.width = "15%";
+	cell4.style.width = "12%";
+	cell1.innerHTML = filename;
+	cell2.innerHTML = size + ' bytes';
+	cell3.innerHTML = uploader;
+	cell4.appendChild(btn);
+}
+
+function getMyFiles(username) {
+	var client = new XMLHttpRequest();
+	client.onreadystatechange = function() {
+		if(this.readyState == this.DONE) {
+			if(this.status == 200 && this.response != null) {
+				var res = JSON.parse(this.response);
+				for (var i in res) {
+					if (document.getElementById("myfiles" + res[i].id) != null) continue;
+					myFiles(res[i].id, res[i].filename, res[i].path, res[i].piece, res[i].type, res[i].size);
+				}
+			}
+		}
+	};
+	client.open("POST", "/myfiles");
+	client.send(JSON.stringify({"username": username}));
+}
+
+function myFiles(id, filename, path, piece, type, size) {
+	var span = document.createElement('span');
+	span.textContent = filename;
+	var btn1 = createDownloadButton(id, filename, path, piece, type, size, 1),
+		btn2 = createDeleteButton(id, filename);
+	var table = document.getElementById('myfile-table');
+	var row = table.insertRow(0);
+		row.id = "myfiles" + id;
+	var cell1 = row.insertCell(0),
+		cell2 = row.insertCell(1),
+		cell3 = row.insertCell(2),
+		cell4 = row.insertCell(3);
+	cell1.appendChild(span);
+	cell2.innerHTML = size + ' bytes';
+	cell3.appendChild(btn1);
+	cell4.appendChild(btn2);
+}
+
+function createDeleteButton(id, filename) {
+	var btn = document.createElement('button');
+	btn.setAttribute("class", "file-button");
+	btn.id = "delete" + id;
+	btn.innerHTML = "Delete";
+	btn.onclick = function () {
+		deleteFileOnServer(id, filename);
+		deleteFileOnCache(id, filename);
+		deleteFileOnP2P(id, filename);
+		var rowIndex = document.getElementById("file" + id).rowIndex;
+		document.getElementById("all-file-table").deleteRow(rowIndex);
+		document.getElementById("myfile-table").deleteRow(this.parentNode.parentNode.rowIndex);
+	}
+	return btn;
+}
+
+function createDownloadButton(id, filename, path, piece, type, size, flag) {
+	var btn = document.createElement('button');
+	btn.setAttribute("class", "file-button");
+	if (flag)
+		btn.id = "_download" + id;
+	else
+		btn.id = "download" + id;
+	btn.innerHTML = "Download";
+	btn.onclick = function () {
+		var canStore = cacheManager.canStoreInCache(id, filename, size);
+		var div = document.createElement('div');
+			div.id = "my-progressbar" + id;
+		if (flag) {
+			document.getElementById("download" + id).style.display = 'none';
+			document.getElementById("_download" + id).style.display = 'none';
+			var rowIndex = document.getElementById("myfiles" + id).rowIndex;
+			var table = document.getElementById('myfile-table');
+				table.rows[rowIndex].cells[2].appendChild(div);
+		} else {
+			if (document.getElementById("_download" + id) != null) document.getElementById("_download" + id).style.display = 'none';
+			document.getElementById("download" + id).style.display = 'none';
+			var rowIndex = document.getElementById("file" + id).rowIndex;
+			var table = document.getElementById('all-file-table');
+				table.rows[rowIndex].cells[3].appendChild(div);
+		}
+		var progressBar = new ProgressBar("my-progressbar" + id, {'width':'100%', 'height':'20px'});
+		var file = new File(id, filename, path, piece, type, size, progressBar, canStore);
+		downloadList.push(file);
+		file.downloadFromCache(downloadList.length - 1);
+	}
+	return btn;
+}
+
+window.onload = function () {
+	getAllFiles();
+	cacheManager = new CacheManager();
+	cacheManager.readManifest();
+	user = new User();
+	setState();
+	connect();
+}
+
+window.onbeforeunload = function () {
+	if (!connected) return;
+	var client = new XMLHttpRequest();
+	client.onreadystatechange = function() {};
+	client.open("POST", "/close");
+	client.send(JSON.stringify({"id": myId}));
+}
+
+function deleteFileOnServer(id, filename) {
+	var client = new XMLHttpRequest();
+	client.onreadystatechange = function() {
+		if(this.readyState == this.DONE) {
+			if(this.status == 200 && this.response != null) {
+				alert(this.response);
+			}
+		}
+	};
+	client.open("POST", "/deletefile");
+	client.send(JSON.stringify({"fileId": id, "filename": filename}));
+}
+
+function deleteFileOnCache(id, filename) {
+	(cacheManager.listFileInCache).sort(function(a, b) { return a.fileId - b.fileId });
+	var index = cacheManager.binarySearch(id, 0, (cacheManager.listFileInCache).length - 1, cacheManager.listFileInCache);
+	if (index == null) return;
+	cacheManager.listFileInCache.splice(index, 1);
+	cacheManager.clearCacheMemory(id, filename);	
+	cacheManager.usedMemory -= cacheManager.listFileInCache[index].size;
+	cacheManager.writeManifest(cacheManager);
+}
+
+function deleteFileOnP2P(id, filename) {
+	var msg = {"fileId": id, "filename": filename};
+	if (connected) data.send({'deletefile': msg}, "all");
+}
+
+function sendFileToPeer(index, id, filename, pieceNum, from) {
+	var path = '/' + filename.replace(/\.[^/.]+$/, "") + '-' + id + '/' + filename.replace(/\.[^/.]+$/, "") + '-' + pieceNum;
+	window.requestFileSystem(window.TEMPORARY, 1024*1024, function(fs) {
+		fs.root.getFile(path, {create: false}, function(fileEntry) {
+			fileEntry.file(function(file) {
+				var reader = new FileReader();
+				reader.onloadend = function(e) {
+					var msg = {"index": index, "filename": filename, "id": id, "pieceNum": pieceNum, "data": this.result};
+					data.send({'data': msg}, from);
+				};
+				reader.readAsText(file);
+			}, doNothing);
+		}, doNothing);
+	}, doNothing);
+}
+
+function searchFileForPeer(index, id, filename, piece, from) {
+	var folder = filename.replace(/\.[^/.]+$/, "") + '-' + id,
+		part = filename.replace(/\.[^/.]+$/, "");	
+	window.requestFileSystem(window.TEMPORARY, 1024*1024, function(fs) {
+		fs.root.getDirectory(folder, {create: false}, function(dirEntry) {
+			var dirReader = dirEntry.createReader();
+			dirReader.readEntries(function(entries) {
+//				if (entries.length >= piece) {
+				if (entries.length > 0) {
+					var msg = {"index": index, "filename": filename, "id": id, "piece": piece};
+					data.send({'hasfile': msg}, from);
+				}
+			}, doNothing);
+		}, doNothing);
+	}, doNothing);
+}
+
+function paginator() {
+	showPage = function(page) {
+		currentPage = page;
+		$("#all-file-table tbody tr").hide();
+		$("#all-file-table tbody tr").each(function(n) {
+			if (n >= pageSize * (page - 1) && n < pageSize * page) $(this).show();
+		});
+	}
+
+	$("#selector").pagination({
+		items: numItems,
+		itemsOnPage: pageSize,
+		cssStyle: "light-theme",
+		currentPage: currentPage,
+		onPageClick: function(pageNumber) {
+			showPage(pageNumber);
+		}
+	});
+	showPage(currentPage);
+}
+
+$(document).ready(function() {
+	$('a.user-btn').click(function() {
+		var signinBox = $(this).attr('href');
+		$(signinBox).fadeIn(300);
+		$('body').append('<div id="over">');
+		$('#over').fadeIn(300);
+		return false;
+	});
+	
+	$('a.user-btn').click(function() {
+		var signupBox = $(this).attr('href');
+		$(signupBox).fadeIn(300);
+		$('body').append('<div id="over">');
+		$('#over').fadeIn(300);
+		return false;
+	});
+
+	$('a.user-btn').click(function() {
+		var myFilesBox = $(this).attr('href');
+		$(myFilesBox).fadeIn(300);
+		$('body').append('<div id="over">');
+		$('#over').fadeIn(300);
+		return false;
+	});
+	
+	$(document).on('click', "a.close, #over", function() {
+		$('#over, .signin').fadeOut(300 , function() {
+			$('#over').remove();
+		});
+		return false;
+	});
+	
+	$(document).on('click', "a.close, #over", function() {
+		$('#over, .signup').fadeOut(300 , function() {
+			$('#over').remove();
+		});
+		return false;
+	});
+	
+});
+</script>
+</html>
