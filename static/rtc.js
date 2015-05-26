@@ -247,7 +247,7 @@ function setStatus(str) {
 		case 'Waiting':
 			statusline.style.display = "inline";
 			status.innerHTML = "No peer in network";
-			btnconnect.style.display = "none";
+//			btnconnect.style.display = "none";
 			break;
 		case 'Connecting':
 			statusline.style.display = "inline";

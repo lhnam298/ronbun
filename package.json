@@ -1,0 +1,9 @@
+{
+  "name": "nodejs",
+  "version": "0.0.1",
+  "description": "demo node.js",
+  "author": "NAMLH",
+  "dependencies": {
+    "socket.io": "~0.9.6"
+  }
+}

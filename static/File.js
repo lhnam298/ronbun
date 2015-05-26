@@ -30,7 +30,7 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 		var folder = this.filename.replace(/\.[^/.]+$/, "") + '-' + this.id,
 			part = this.filename.replace(/\.[^/.]+$/, "");
 
-		window.requestFileSystem(window.TEMPORARY, 1024*1024, function(fs) {
+		window.requestFileSystem(window.TEMPORARY, 1024*64, function(fs) {
 			fs.root.getDirectory(folder, {create: false}, function(dirEntry) {
 				for (var i = 0; i < downloadList[index].piece; i++) {
 					downloadPartFromCache(index, i, folder, part);
@@ -40,12 +40,10 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 	}
 	
 	function downloadFromServer(index) {
-		for (var i = 0; i < downloadList[index].piece; i++) {
-			downloadPartFromServer(index, i);
-		}
+		downloadPartFromServer(index, 0, 1);
 	}
 
-	function downloadPartFromServer(index, num) {
+	function downloadPartFromServer(index, num, flag) {
 		var client = new XMLHttpRequest();
 		client.onreadystatechange = function() {
 			if(this.readyState == this.DONE) {
@@ -55,14 +53,16 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 					downloadList[index].downloadedSize += res.content.length;
 					downloadList[index].progressBar.setPercent(downloadList[index].downloadedSize/downloadList[index].size*100);
 					//(this.buff)[num] = this.response;
-					console.log('Download part '+ num +' from server');
-//					saveFileToCache(res.content, num, index);
+					// console.log('Download part '+ num +' from server');
+					// saveFileToCache(res.content, num, index);
 					downloadList[index].receivedNum++;
 					if (downloadList[index].receivedNum == downloadList[index].piece) {
 						downloadList[index].saveToDisk(downloadList[index].buff.join(''), downloadList[index].id,
 														downloadList[index].filename, downloadList[index].type);
 						downloadList[index].finish = true;
 					}
+					if (flag)
+						if (num < downloadList[index].piece - 1) downloadPartFromServer(index, num + 1, flag);
 				} else alert('Download fail!');
 			}
 		};
@@ -106,7 +106,7 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 	}
 
 	function downloadPartFromCache(index, num, folder, part) {
-		var onPartError = function (index) {
+		var onPartError = function () {
 			if (connected) searchFileInP2P(index, num);
 			else downloadPartFromServer(index, num);
 		}
@@ -116,7 +116,7 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 				fileEntry.file(function(file) {
 					var reader = new FileReader();
 					reader.onloadend = function(e) {
-						console.log('Download part '+ num +' from cache');
+//						console.log('Download part '+ num +' from cache');
 						downloadList[index].buff[num] = this.result;
 						downloadList[index].downloadedSize += this.result.length;
 						downloadList[index].progressBar.setPercent(downloadList[index].downloadedSize/downloadList[index].size*100);
@@ -140,7 +140,7 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 		}
 		var folder = downloadList[index].filename.replace(/\.[^/.]+$/, "") + '-' + downloadList[index].id,
 			partName = downloadList[index].filename.replace(/\.[^/.]+$/, "") + '-' + num;
-		
+			
 		window.requestFileSystem(window.TEMPORARY, 1024*1024, function(fs) {
 			fs.root.getDirectory(folder, {create: true}, function(dirEntry) {
 				fs.root.getFile('/' + folder + '/' + partName, {create: true}, function(fileEntry) {
@@ -177,6 +177,10 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 	}
 
 	File.prototype.saveToDisk = function (data, id, fileName, type) {
+		// measure time
+		finishTime = Date.now();
+		console.log(finishTime - startTime);
+		
 		document.getElementById('my-progressbar' + id).parentNode.removeChild(document.getElementById('my-progressbar' + id));
 		document.getElementById('download' + id).style.display = "inline";
 		if (document.getElementById('_download' + id) != null) document.getElementById('_download' + id).style.display = "inline";
@@ -184,6 +188,7 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 		var index = cacheManager.binarySearch(id, 0, (cacheManager.listFileInCache).length - 1, cacheManager.listFileInCache);
 		if (index != null) (cacheManager.listFileInCache)[index].canDelete = true;
 		/**/
+		
 		var blobURL = dataURItoBlob(data);
 		var save = new Blob([blobURL], {type: type});
 		var downloadLink = document.createElement("a");
@@ -191,9 +196,6 @@ function File(_id, _filename, _path, _piece, _type, _size, _progressBar, _canSto
 		if ((window.URL || window.webkitURL) != null)
 			downloadLink.href = (window.URL || window.webkitURL).createObjectURL(save);
 		downloadLink.click();
-		// measure time
-		finishTime = Date.now();
-		console.log(finishTime - startTime);
 	}
 
 }

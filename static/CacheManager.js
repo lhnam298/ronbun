@@ -4,7 +4,7 @@ var fs = null;
 
 if (window.requestFileSystem) {
 	viewListFolder();
-//	removeFolder();
+	// removeFolder();
 } else {
 	alert('Sorry! Your browser doesn\'t support the FileSystem API');
 }
@@ -32,17 +32,17 @@ function viewListFolder() {
 function removeFolder() {
 	function onRead(fs) {
 
-		fs.root.getFile('/history.txt', {}, function(fileEntry) {
-			fileEntry.remove(function() {
-				console.log('File removed.');
+		// fs.root.getFile('/history.txt', {}, function(fileEntry) {
+		// 	fileEntry.remove(function() {
+		// 		console.log('File removed.');
+		// 	}, onError);
+		// }, onError);
+			
+		fs.root.getDirectory('/Hoc phi 20133-dot 1-30062014_gui-4', {}, function(dirEntry){			
+			dirEntry.removeRecursively(function() {
+				console.log('Directory removed.');
 			}, onError);
 		}, onError);
-			
-//		fs.root.getDirectory('/1-159', {}, function(dirEntry){			
-//			dirEntry.removeRecursively(function() {
-//				console.log('Directory removed.');
-//			}, onError);
-//		}, onError);
 	}
 	window.requestFileSystem(TEMPORARY, 1024*1024 /*1MB*/, onRead, onError);
 }
@@ -158,7 +158,7 @@ CacheManager.prototype.readManifest = function() {
 				var reader = new FileReader();
 				reader.onloadend = function(e) {
 					if (this.result != "") {
-						console.log(this.result);
+//						console.log(this.result);
 						var array = this.result.split('\n');
 						for (var i = 0; i < array.length; i++) {
 							var temp = array[i].split('\t');

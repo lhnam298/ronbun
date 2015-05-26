@@ -78,7 +78,7 @@ function User() {
 							setCookie('user', _username, 1);
 							setState();
 							console.log('Confirm user in cache');
-							$('#over, .signin').fadeOut(300 , function() {
+							$('#over, .box').fadeOut(300 , function() {
 								$('#over').remove();
 							});
 						} else alert('Sign in fail (cache)');
@@ -103,7 +103,7 @@ function User() {
 								setCookie('user', _username, 1);
 								setState();
 								console.log('Confirm user in server');
-								$('#over, .signin').fadeOut(300 , function() {
+								$('#over, .box').fadeOut(300 , function() {
 									$('#over').remove();
 								});
 							}
@@ -119,7 +119,7 @@ function User() {
 				setCookie('user', _username, 1);
 				setState();
 				console.log('Confirm user in p2p');
-				$('#over, .signin').fadeOut(300 , function() {
+				$('#over, .box').fadeOut(300 , function() {
 					$('#over').remove();
 				});
 			} else alert('Sign in fail (p2p)');
@@ -189,13 +189,13 @@ function User() {
 		var file = document.getElementById("files").files[0],
 		filename = (document.getElementById("files").value).replace(/^.*[\\\/]/, '');
 		if (filename == "") return;
-		var	chunkLength = 1024*4,
+		var	chunkLength = 1024*64,
 			size = file.size,
 			uploadedSize = 0;
 		var div = document.createElement('div');
 		div.id = "my-progressbar";
-		document.getElementById('file-area').appendChild(div);
-		var progressBar = new ProgressBar("my-progressbar", {'width': '100%', 'height': '10px'});
+		document.getElementById('file-to-up').appendChild(div);
+		var progressBar = new ProgressBar("my-progressbar", {'width': '99%', 'height': '10px'});
 		document.getElementById('upload-title').innerHTML = "Uploading...";
 		document.getElementById('files').style.display = "none";
 		document.getElementById('upload').style.display = "none";
@@ -231,7 +231,7 @@ function User() {
 								document.getElementById('upload-title').innerHTML = "Choose file to upload";
 								document.getElementById('files').style.display = "inline";
 								document.getElementById('upload').style.display = "inline";
-								document.getElementById('file-area').removeChild(div);
+								document.getElementById('file-to-up').removeChild(div);
 							}
 						}
 					}
